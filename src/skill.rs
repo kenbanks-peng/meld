@@ -46,12 +46,12 @@ pub fn guide(setup: &Setup) -> String {
             .iter()
             .map(|key| {
                 let value = match (name.as_str(), key.as_str()) {
-                    ("hero", "title") => "Weekly report",
-                    ("panel", "title") => "Delivery",
+                    ("hero", "title") => "Conversation result",
+                    ("panel", "title") => "Findings and verification",
                     ("callout", "title") => "Next step",
-                    ("chart", "title") => "Deployments",
-                    ("metric", "label") => "Deployments",
-                    ("metric", "value") => "24",
+                    ("chart", "title") => "Verification results",
+                    ("metric", "label") => "Tests passed",
+                    ("metric", "value") => "12",
                     ("grid", "columns") => "2",
                     _ => key,
                 };
@@ -66,8 +66,8 @@ pub fn guide(setup: &Setup) -> String {
                 format!("({attrs})")
             };
             let body = match name.as_str() {
-                "badge" => "Week 12",
-                "status" => "On track",
+                "badge" => "Example session",
+                "status" => "Verified",
                 _ => "Example",
             };
             inlines.push(format!("@{name}{args}[{body}]"));
@@ -78,15 +78,21 @@ pub fn guide(setup: &Setup) -> String {
                 format!(" {attrs}")
             };
             let body = match name.as_str() {
-                "masthead" => "**Platform team**\n\nWeek 12",
-                "hero" => "Smaller releases, faster feedback.",
+                "masthead" => "**Agent conversation**\n\nTask: fix configuration loading",
+                "hero" => {
+                    "Configuration paths now resolve relative to the config file, not the working directory."
+                }
                 "grid" | "panel" => "",
-                "metric" => "Up from 18 last week.",
-                "summary" => "**Release time fell by 30%.** All services met their targets.",
-                "callout" => "- Finish the cache rollout.\n- Measure build times.",
-                "chart" => "Week | Deployments\n--- | ---\n11 | 18\n12 | 24",
-                "muted" => "Production only; excludes rollbacks.",
-                "footer" => "Platform team · Internal",
+                "metric" => "All checks passed in this example session.",
+                "summary" => {
+                    "**Fixed relative path resolution.** Inspection found paths were resolved from the working directory. Updated the loader and added regression tests."
+                }
+                "callout" => "- Review the diff.\n- Commit when ready.",
+                "chart" => "Check | Passed\n--- | ---\nUnit tests | 9\nIntegration tests | 3",
+                "muted" => {
+                    "Illustrative conversation outcome; these results are not from a live run."
+                }
+                "footer" => "Agent conversation · Result and handoff",
                 _ => "Example **Markdown**.",
             };
             blocks.insert(name.as_str(), format!("@{name}{args}\n{}", indent(body)));
@@ -99,7 +105,7 @@ pub fn guide(setup: &Setup) -> String {
         out.push_str("\nChart body: Markdown table; first column is categories, followed by 1–6\nfinite, nonnegative numeric series. Use plain numbers, without units or separators.\n");
     }
 
-    // Assemble one report, nesting only components declared in block mode.
+    // Assemble one conversation result, nesting only components declared in block mode.
     for (parent, children) in [
         ("grid", &["metric", "callout"][..]),
         ("panel", &["summary", "chart", "muted"][..]),
@@ -137,7 +143,7 @@ pub fn guide(setup: &Setup) -> String {
     }
     // Attribute values may contain fence characters.
     let fence = "~".repeat(example.chars().filter(|c| *c == '~').count().max(2) + 1);
-    writeln!(out, "\n## Complete example\n\nAdapt the content and use only the components your document needs.\n\n{fence}meld\n{}\n{fence}", example.trim_end()).unwrap();
+    writeln!(out, "\n## Complete example\n\nThis illustrative agent conversation result shows findings, changes, verification, and next steps. Adapt it to the actual conversation; never invent actions or verification results. Use only the components your document needs.\n\n{fence}meld\n{}\n{fence}", example.trim_end()).unwrap();
     out
 }
 

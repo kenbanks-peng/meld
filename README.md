@@ -2,9 +2,7 @@
 
 **Mark Elements Down.**
 
-Rust CLI that converts component-enhanced Markdown (`.meld`) into standalone,
-responsive HTML. Includes the demo’s Catppuccin Mocha theme, Markdown tables,
-and accessible SVG bar charts. No browser JavaScript or network assets.
+Use Meld to supplement Markdown with component elements to produce self-contained HTML.
 
 ## Install and use
 
@@ -13,8 +11,8 @@ Requires Rust with edition 2024 support.
 ```sh
 cargo install --path .
 meld demo.meld --title "Engineering pulse · Q3 2026"
-meld report.meld -o report.html
-meld report.meld -o -                  # stdout
+meld document.meld -o document.html
+meld document.meld -o -                  # stdout
 meld skill                            # authoring guide + active component examples
 ```
 
@@ -29,7 +27,7 @@ use, Meld seeds `config.toml`, the full `theme.css`, and `components/*.html`.
 Edit these files, then render normally:
 
 ```sh
-meld report.meld
+meld document.meld
 ```
 
 Rendering reads only external configuration, CSS, and templates. Embedded assets
@@ -49,7 +47,7 @@ Theme and template paths resolve relative to the config, not the working directo
 A minimal standalone config (defines only `@notice`):
 
 ```toml
-title = "My report"
+title = "My document"
 lang = "en"
 
 [theme.variables]

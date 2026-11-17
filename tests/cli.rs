@@ -75,6 +75,10 @@ fn skill_prints_active_guide_without_working_directory_files() {
     assert!(out.stderr.is_empty());
     let guide = String::from_utf8(out.stdout).unwrap();
     assert!(guide.starts_with(include_str!("../assets/skill.md")));
+    assert!(guide.contains("Use Meld to supplement Markdown with component elements"));
+    assert!(guide.contains("never invent actions or verification results"));
+    assert!(!guide.contains("Weekly report"));
+    assert!(!guide.contains("Deployments"));
     for name in [
         "badge", "callout", "chart", "footer", "grid", "hero", "masthead", "metric", "muted",
         "panel", "status", "summary",
@@ -111,7 +115,10 @@ fn skill_example_renders() {
     assert_eq!(examples.len(), 1);
     let html = render(&examples.join("\n\n"));
     for expected in [
-        "Weekly report",
+        "Conversation result",
+        "Findings and verification",
+        "Fixed relative path resolution.",
+        "Review the diff.",
         "cols-2",
         "status positive",
         "<svg ",
