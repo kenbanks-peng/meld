@@ -3,7 +3,7 @@
 Use Meld to supplement Markdown with component elements to produce self-contained HTML.
 
 Write UTF-8 Markdown plus components in `document.meld`. Render with
-`meld document.meld` to create `document.html`; fix any reported errors and rerun.
+`meld document.meld` to create `document.html`.
 
 ## Syntax
 
