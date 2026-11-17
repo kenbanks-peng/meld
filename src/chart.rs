@@ -78,7 +78,7 @@ pub fn render(source: &str, title: &str) -> Result<(String, Vec<String>)> {
             let y = position(*value);
             let h = (y - baseline).abs();
             svg.push_str(&format!("<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{h}\" rx=\"3\" class=\"series-{j}\"><title>{}, {}: {value}</title></rect>",
-                x + group*0.14 + j as f64*width, y.min(baseline), width*0.85, escape(rows[0][j+1]), escape(rows[i+2][0])));
+                x + group*0.14 + width*0.075 + j as f64*width, y.min(baseline), width*0.85, escape(rows[0][j+1]), escape(rows[i+2][0])));
         }
     }
     svg.push_str("</svg><div class=\"chart-legend\">");
@@ -101,6 +101,50 @@ pub fn render(source: &str, title: &str) -> Result<(String, Vec<String>)> {
 #[cfg(test)]
 mod tests {
     use super::render;
+
+    #[test]
+    fn category_labels_are_centered_over_bar_groups() {
+        for series_count in [1, 2, 3] {
+            let mut source = String::from("Category");
+            for series in 0..series_count {
+                source.push_str(&format!(" | Series {series}"));
+            }
+            source.push_str(&format!("\n---{}\n", " | ---".repeat(series_count)));
+            for category in ["Unit tests", "Integration tests"] {
+                source.push_str(category);
+                source.push_str(&" | 3".repeat(series_count));
+                source.push('\n');
+            }
+
+            let (html, _) = render(&source, "Test").unwrap();
+            let attribute = |element: &str, name: &str| -> f64 {
+                element
+                    .split_once(&format!("{name}=\""))
+                    .unwrap()
+                    .1
+                    .split('"')
+                    .next()
+                    .unwrap()
+                    .parse()
+                    .unwrap()
+            };
+            let labels: Vec<_> = html
+                .split("<text ")
+                .skip(1)
+                .filter(|element| element.contains("text-anchor=\"middle\""))
+                .map(|element| attribute(element, "x"))
+                .collect();
+            let bars: Vec<_> = html.split("<rect ").skip(1).collect();
+            assert_eq!(labels.len(), 2);
+            assert_eq!(bars.len(), 2 * series_count);
+            for (label, group) in labels.iter().zip(bars.chunks(series_count)) {
+                let left = attribute(group[0], "x");
+                let last = group.last().unwrap();
+                let right = attribute(last, "x") + attribute(last, "width");
+                assert!((label - (left + right) / 2.0).abs() < 1e-9);
+            }
+        }
+    }
 
     #[test]
     fn finite_values_produce_finite_bounded_geometry() {

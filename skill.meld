@@ -1,0 +1,33 @@
+@masthead
+  **Agent conversation**
+
+  Task: fix configuration loading
+
+@hero title="Conversation result"
+  Configuration paths now resolve relative to the config file, not the working directory.
+
+@badge[Example session] @status[Verified]
+
+@grid
+  @metric label="Tests passed" value="12"
+    All checks passed in this example session.
+
+  @callout title="Next step"
+    - Review the diff.
+    - Commit when ready.
+
+@panel title="Findings and verification"
+  @summary
+    **Fixed relative path resolution.** Inspection found paths were resolved from the working directory. Updated the loader and added regression tests.
+
+  @chart title="Verification results"
+    Check | Passed
+    --- | ---
+    Unit tests | 9
+    Integration tests | 3
+
+  @muted
+    Illustrative conversation outcome; these results are not from a live run.
+
+@footer
+  Agent conversation · Result and handoff
