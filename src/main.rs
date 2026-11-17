@@ -5,7 +5,7 @@ mod syntax;
 
 use anyhow::{Context, Result};
 use base64::{Engine, engine::general_purpose::STANDARD};
-use clap::{CommandFactory, Parser};
+use clap::{CommandFactory, Parser, Subcommand};
 use sha2::{Digest, Sha256};
 use std::{
     fs,
@@ -16,19 +16,23 @@ use std::{
 #[derive(Parser)]
 #[command(
     version,
+    subcommand_negates_reqs = true,
+    args_conflicts_with_subcommands = true,
     about = "Mark Elements Down: convert component-enhanced Markdown to standalone HTML"
 )]
 struct Cli {
+    #[command(subcommand)]
+    command: Option<Commands>,
     /// Input .meld file (output defaults to the same path with .html extension)
     #[arg(required_unless_present = "init")]
     input: Option<PathBuf>,
     /// Output file, or - for stdout
     #[arg(short, long)]
     output: Option<PathBuf>,
-    /// TOML config; relative asset paths resolve beside this file
+    /// Alternative TOML config (default: $XDG_CONFIG_HOME/meld/config.toml)
     #[arg(short, long)]
     config: Option<PathBuf>,
-    /// Directory of component .html templates (overrides built-ins and config)
+    /// Directory of component .html templates (overrides configured templates)
     #[arg(long)]
     components: Option<PathBuf>,
     /// Override the document title
@@ -39,7 +43,19 @@ struct Cli {
     init: Option<PathBuf>,
 }
 
-fn run(cli: Cli) -> Result<()> {
+#[derive(Subcommand)]
+enum Commands {
+    /// Print concise agent instructions for authoring and rendering Meld files
+    Skill,
+}
+
+fn run(cli: Cli, default_config: PathBuf) -> Result<()> {
+    if let Some(Commands::Skill) = cli.command {
+        io::stdout()
+            .lock()
+            .write_all(include_bytes!("../assets/skill.md"))?;
+        return Ok(());
+    }
     if let Some(dir) = cli.init {
         return config::Setup::init(&dir);
     }
@@ -52,7 +68,10 @@ fn run(cli: Cli) -> Result<()> {
             "output resolves to input"
         );
     }
-    let setup = config::Setup::load(cli.config.as_deref(), cli.components.as_deref())?;
+    let setup = config::Setup::load(
+        cli.config.as_deref().unwrap_or(&default_config),
+        cli.components.as_deref(),
+    )?;
     let source =
         fs::read_to_string(&input).with_context(|| format!("reading {}", input.display()))?;
     let body = render::Renderer::new(&setup)?.render(&source)?;
@@ -83,11 +102,18 @@ fn run(cli: Cli) -> Result<()> {
 }
 
 fn main() {
+    let default_config = match config::Setup::ensure_default() {
+        Ok(path) => path,
+        Err(err) => {
+            eprintln!("error: {err:#}");
+            std::process::exit(1);
+        }
+    };
     if std::env::args_os().len() == 1 {
         Cli::command().print_help().expect("failed to print help");
         return;
     }
-    if let Err(err) = run(Cli::parse()) {
+    if let Err(err) = run(Cli::parse(), default_config) {
         eprintln!("error: {err:#}");
         std::process::exit(1);
     }

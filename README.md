@@ -15,6 +15,7 @@ cargo install --path .
 meld demo.meld --title "Engineering pulse · Q3 2026"
 meld report.meld -o report.html
 meld report.meld -o -                  # stdout
+meld skill                            # concise agent guide with an example
 ```
 
 Without `-o`, output uses the input filename with an `.html` extension.
@@ -22,18 +23,30 @@ Errors leave the output untouched.
 
 ## Themes and components
 
-Export an editable starter design into a **new** directory:
+Every run ensures `$XDG_CONFIG_HOME/meld` exists (falling back to
+`~/.config/meld` when XDG_CONFIG_HOME is unset, empty, or relative). On first
+use, Meld seeds `config.toml`, the full `theme.css`, and `components/*.html`.
+Edit these files, then render normally:
+
+```sh
+meld report.meld
+```
+
+Rendering reads only external configuration, CSS, and templates. Embedded assets
+are used only to seed new designs. Existing designs are never overwritten or
+silently repaired; missing or invalid referenced files produce errors.
+
+For an alternative design, export into a **new** directory:
 
 ```sh
 meld --init design
 meld demo.meld --config design/config.toml
 ```
 
-Edit `design/config.toml`, `design/theme.css`, or any template in
-`design/components/`. Theme and template paths resolve relative to the config,
-not the working directory. Configuration is explicit; no files are auto-discovered.
+`--config` replaces the default design, rather than merging with it.
+Theme and template paths resolve relative to the config, not the working directory.
 
-A minimal config:
+A minimal standalone config (defines only `@notice`):
 
 ```toml
 title = "My report"
@@ -45,7 +58,7 @@ text = "#cdd6f4"
 mauve = "#cba6f7"
 
 [theme]
-css = "extra.css" # optional; appended after the built-in stylesheet
+css = "theme.css" # optional; the complete stylesheet
 
 [components.notice]
 template = "notice.html"
@@ -76,12 +89,13 @@ Attributes are strings. Template attributes are HTML-escaped automatically.
 Templates and CSS are **trusted application code**; do not load untrusted designs
 or mark attribute values safe.
 
-Override a built-in by using its name in `[components.NAME]`. Defaults and inline
-mode are inherited; supplied defaults merge, and a nonempty `required` list
-replaces the inherited list. Missing template attributes are errors.
+Each `[components.NAME]` defines its template, required attributes, defaults,
+and inline mode. The seeded config includes complete definitions for all starter
+components. There are no implicit component definitions or inherited defaults.
+Missing template attributes are errors.
 
 Alternatively, `--components directory` loads all `*.html` files by component name,
-overriding configured and built-in templates. New names default to block components.
+overriding configured templates. New names default to block components.
 Set `inline = true` in their config to support `@name[content]`.
 
 ## Meld syntax
@@ -128,8 +142,8 @@ The rendered SVG includes a legend and an expandable data table.
 Metric templates also receive `number` and `unit`; chart templates receive `chart`
 (the generated SVG and legend).
 
-The embedded stylesheet uses CSS variables from `assets/theme.css`.
-Override them in `[theme.variables]`; use custom CSS for layout changes or
+The seeded stylesheet uses CSS variables. Override them in
+`[theme.variables]` (applied after the stylesheet); edit the CSS for layout changes or
 `:root { color-scheme: light; }`. The generated content-security policy permits
 only the hashed stylesheet: no scripts, remote resources, or inline style attributes.
 

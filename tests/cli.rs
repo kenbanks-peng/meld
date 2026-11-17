@@ -6,7 +6,9 @@ use std::{
 use tempfile::TempDir;
 
 fn cli(args: &[&str]) -> Output {
+    let config_home = TempDir::new().unwrap();
     Command::new(env!("CARGO_BIN_EXE_meld"))
+        .env("XDG_CONFIG_HOME", config_home.path())
         .args(args)
         .output()
         .unwrap()
@@ -57,6 +59,61 @@ fn cli_uses_meld_branding() {
     assert!(help.contains("Mark Elements Down"));
     assert!(help.contains("Usage: meld "));
     assert!(help.contains("Input .meld file"));
+}
+
+#[test]
+fn skill_prints_embedded_guide_without_files() {
+    let tmp = TempDir::new().unwrap();
+    let config_home = TempDir::new().unwrap();
+    let out = Command::new(env!("CARGO_BIN_EXE_meld"))
+        .env("XDG_CONFIG_HOME", config_home.path())
+        .arg("skill")
+        .current_dir(tmp.path())
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    assert!(out.stderr.is_empty());
+    assert_eq!(
+        String::from_utf8(out.stdout).unwrap(),
+        include_str!("../assets/skill.md")
+    );
+    assert_eq!(fs::read_dir(tmp.path()).unwrap().count(), 0);
+    assert!(success(&["--help"]).contains("skill"));
+    assert!(success(&["skill", "--help"]).contains("agent instructions"));
+}
+
+#[test]
+fn skill_example_renders() {
+    let guide = success(&["skill"]);
+    let example = guide
+        .split_once("\x60\x60\x60meld\n")
+        .unwrap()
+        .1
+        .split_once("\x60\x60\x60")
+        .unwrap()
+        .0;
+    let html = render(example);
+    for expected in [
+        "Weekly report",
+        "cols-2",
+        "99.97",
+        "status warning",
+        "<svg ",
+    ] {
+        assert!(html.contains(expected), "missing {expected}");
+    }
+}
+
+#[test]
+fn skill_rejects_render_arguments() {
+    for args in [
+        vec!["skill", "report.meld"],
+        vec!["skill", "-o", "report.html"],
+        vec!["--title", "Report", "skill"],
+        vec!["--init", "design", "skill"],
+    ] {
+        assert!(!cli(&args).status.success(), "{args:?}");
+    }
 }
 
 #[test]
@@ -207,8 +264,14 @@ fn export_edit_and_extend() {
 }
 
 #[test]
-fn template_directory_and_partial_config_override() {
+fn template_directory_overrides_external_config() {
     let tmp = TempDir::new().unwrap();
+    let design = tmp.path().join("design");
+    success(&["--init", design.to_str().unwrap()]);
+    let cfg = fs::read_to_string(design.join("config.toml"))
+        .unwrap()
+        .replace("components/metric.html", "../metric.html");
+    fs::write(design.join("config.toml"), cfg).unwrap();
     fs::write(tmp.path().join("badge.html"), "<em>{{ content|safe }}</em>").unwrap();
     fs::write(
         tmp.path().join("extra.html"),
@@ -221,11 +284,6 @@ fn template_directory_and_partial_config_override() {
     )
     .unwrap();
     fs::write(
-        tmp.path().join("config.toml"),
-        "[components.metric]\ntemplate='metric.html'\n",
-    )
-    .unwrap();
-    fs::write(
         tmp.path().join("input.meld"),
         "@metric label=Test value=5\n\n@badge[X]\n\n@extra\n  Y\n",
     )
@@ -235,7 +293,7 @@ fn template_directory_and_partial_config_override() {
         "--components",
         tmp.path().to_str().unwrap(),
         "--config",
-        tmp.path().join("config.toml").to_str().unwrap(),
+        design.join("config.toml").to_str().unwrap(),
         "-o",
         "-",
     ]);
@@ -295,4 +353,117 @@ fn rejects_bad_config_and_css() {
         assert!(!out.status.success());
         assert!(!Path::new(&input.with_extension("html")).exists());
     }
+}
+
+#[test]
+fn default_design_is_seeded_and_customizations_are_reused() {
+    let tmp = TempDir::new().unwrap();
+    let root = tmp.path().join("nested/config");
+    let input = tmp.path().join("input.meld");
+    fs::write(&input, "@badge[Hello]").unwrap();
+    let run = || {
+        Command::new(env!("CARGO_BIN_EXE_meld"))
+            .env("XDG_CONFIG_HOME", &root)
+            .arg(&input)
+            .args(["-o", "-"])
+            .output()
+            .unwrap()
+    };
+    let first = run();
+    assert!(first.status.success(), "{first:?}");
+    let design = root.join("meld");
+    assert!(design.join("config.toml").is_file());
+    assert_eq!(
+        fs::read_to_string(design.join("theme.css")).unwrap(),
+        include_str!("../assets/theme.css")
+    );
+    fs::write(
+        design.join("components/badge.html"),
+        "<b>{{ content|safe }}</b>",
+    )
+    .unwrap();
+    fs::write(design.join("theme.css"), "/* custom only */").unwrap();
+    let cfg = fs::read_to_string(design.join("config.toml"))
+        .unwrap()
+        .replace("My report", "Custom title");
+    fs::write(design.join("config.toml"), &cfg).unwrap();
+    for _ in 0..2 {
+        let out = run();
+        assert!(out.status.success(), "{out:?}");
+        let html = String::from_utf8(out.stdout).unwrap();
+        assert!(html.contains("<b>Hello</b>"));
+        assert!(html.contains("<title>Custom title</title>"));
+        assert!(html.contains("/* custom only */"));
+        assert!(!html.contains("--base:"));
+        assert_eq!(fs::read_to_string(design.join("config.toml")).unwrap(), cfg);
+    }
+    fs::remove_file(design.join("components/badge.html")).unwrap();
+    let out = run();
+    assert!(!out.status.success());
+    assert!(String::from_utf8_lossy(&out.stderr).contains("reading template for @badge"));
+    assert!(!design.join("components/badge.html").exists());
+    fs::remove_file(design.join("config.toml")).unwrap();
+    assert!(!run().status.success());
+    assert!(!design.join("config.toml").exists());
+}
+
+#[test]
+fn home_fallback_seeds_even_when_printing_help() {
+    for xdg in [None, Some(""), Some("relative/path")] {
+        let tmp = TempDir::new().unwrap();
+        let mut command = Command::new(env!("CARGO_BIN_EXE_meld"));
+        command
+            .env("HOME", tmp.path())
+            .env_remove("XDG_CONFIG_HOME")
+            .arg("--help");
+        if let Some(value) = xdg {
+            command.env("XDG_CONFIG_HOME", value);
+        }
+        let out = command.output().unwrap();
+        assert!(out.status.success(), "{out:?}");
+        assert!(tmp.path().join(".config/meld/config.toml").is_file());
+    }
+}
+
+#[test]
+fn alternative_config_has_no_implicit_components_or_css() {
+    let tmp = TempDir::new().unwrap();
+    let input = tmp.path().join("input.meld");
+    let config = tmp.path().join("config.toml");
+    fs::write(&config, "").unwrap();
+    fs::write(&input, "# Plain").unwrap();
+    let args = [
+        input.to_str().unwrap(),
+        "-c",
+        config.to_str().unwrap(),
+        "-o",
+        "-",
+    ];
+    let html = success(&args);
+    assert!(html.contains("<style></style>"));
+    fs::write(&input, "@badge[Hello]").unwrap();
+    let out = cli(&args);
+    assert!(!out.status.success());
+    assert!(String::from_utf8_lossy(&out.stderr).contains("unknown component @badge"));
+}
+
+#[test]
+fn existing_invalid_default_is_not_overwritten() {
+    let tmp = TempDir::new().unwrap();
+    let design = tmp.path().join("meld");
+    fs::create_dir(&design).unwrap();
+    fs::write(design.join("config.toml"), "not valid TOML").unwrap();
+    let input = tmp.path().join("input.meld");
+    fs::write(&input, "# Hello").unwrap();
+    let out = Command::new(env!("CARGO_BIN_EXE_meld"))
+        .env("XDG_CONFIG_HOME", tmp.path())
+        .arg(&input)
+        .output()
+        .unwrap();
+    assert!(!out.status.success());
+    assert_eq!(
+        fs::read_to_string(design.join("config.toml")).unwrap(),
+        "not valid TOML"
+    );
+    assert!(!design.join("theme.css").exists());
 }

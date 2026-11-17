@@ -1,6 +1,10 @@
 use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, fs, path::Path};
+use std::{
+    collections::BTreeMap,
+    env, fs,
+    path::{Path, PathBuf},
+};
 
 pub const CSS: &str = include_str!("../assets/theme.css");
 pub const TEMPLATES: &[(&str, &str)] = &[
@@ -86,20 +90,32 @@ pub fn valid_name(s: &str) -> bool {
 }
 
 impl Setup {
-    pub fn load(path: Option<&Path>, component_dir: Option<&Path>) -> Result<Self> {
-        let config: Config = match path {
-            Some(p) => toml::from_str(
-                &fs::read_to_string(p).with_context(|| format!("reading {}", p.display()))?,
+    pub fn ensure_default() -> Result<PathBuf> {
+        let root = match env::var_os("XDG_CONFIG_HOME").filter(|s| !s.is_empty()) {
+            Some(path) if Path::new(&path).is_absolute() => PathBuf::from(path),
+            _ => PathBuf::from(
+                env::var_os("HOME")
+                    .filter(|s| !s.is_empty())
+                    .context("HOME is not set")?,
             )
-            .with_context(|| format!("parsing {}", p.display()))?,
-            None => Config::default(),
+            .join(".config"),
         };
-        let base = path.and_then(Path::parent).unwrap_or(Path::new("."));
-        let mut definitions = builtin_definitions();
-        let mut templates: BTreeMap<String, String> = TEMPLATES
-            .iter()
-            .map(|(k, v)| (k.to_string(), v.to_string()))
-            .collect();
+        let dir = root.join("meld");
+        if !dir.try_exists()? {
+            fs::create_dir_all(&root).with_context(|| format!("creating {}", root.display()))?;
+            Self::init(&dir)?;
+        }
+        Ok(dir.join("config.toml"))
+    }
+
+    pub fn load(path: &Path, component_dir: Option<&Path>) -> Result<Self> {
+        let config: Config = toml::from_str(
+            &fs::read_to_string(path).with_context(|| format!("reading {}", path.display()))?,
+        )
+        .with_context(|| format!("parsing {}", path.display()))?;
+        let base = path.parent().unwrap_or(Path::new("."));
+        let mut definitions = BTreeMap::new();
+        let mut templates = BTreeMap::new();
         for (name, custom) in &config.components {
             anyhow::ensure!(valid_name(name), "invalid component name: {name}");
             if let Some(file) = &custom.template {
@@ -109,14 +125,7 @@ impl Setup {
                         .with_context(|| format!("reading template for @{name}"))?,
                 );
             }
-            let definition = definitions.entry(name.clone()).or_default();
-            if let Some(inline) = custom.inline {
-                definition.inline = Some(inline);
-            }
-            if !custom.required.is_empty() {
-                definition.required = custom.required.clone();
-            }
-            definition.defaults.extend(custom.defaults.clone());
+            definitions.insert(name.clone(), custom.clone());
         }
         if let Some(dir) = component_dir {
             for entry in fs::read_dir(dir).with_context(|| format!("reading {}", dir.display()))? {
@@ -138,7 +147,10 @@ impl Setup {
                 "component @{name} needs a template"
             );
         }
-        let mut css = CSS.to_string();
+        let mut css = match &config.theme.css {
+            Some(file) => fs::read_to_string(base.join(file)).context("reading theme CSS")?,
+            None => String::new(),
+        };
         if !config.theme.variables.is_empty() {
             css.push_str("\n:root {\n");
             for (key, value) in &config.theme.variables {
@@ -148,9 +160,6 @@ impl Setup {
                 css.push_str(&format!("  --{key}: {value};\n"));
             }
             css.push_str("}\n");
-        }
-        if let Some(file) = &config.theme.css {
-            css.push_str(&fs::read_to_string(base.join(file)).context("reading theme CSS")?);
         }
         anyhow::ensure!(
             !css.to_ascii_lowercase().contains("</style"),
@@ -169,7 +178,7 @@ impl Setup {
         fs::create_dir(dir)
             .with_context(|| format!("creating {} (must not exist)", dir.display()))?;
         fs::create_dir(dir.join("components"))?;
-        fs::write(dir.join("theme.css"), "/* Additional trusted CSS. */\n")?;
+        fs::write(dir.join("theme.css"), CSS)?;
         let mut config = Config {
             title: Some("My report".into()),
             lang: Some("en".into()),
