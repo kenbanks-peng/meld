@@ -346,7 +346,10 @@ fn unsafe_document_input_is_escaped() {
 fn diagnostics() {
     failure("@unknown\n  hello\n", "line 1");
     failure("@hero\n  text\n", "requires attribute title");
-    failure("@grid columns=9\n", "columns must be");
+    failure("@grid columns=0\n", "positive integer");
+    failure("@grid columns=-1\n", "positive integer");
+    failure("@grid columns=2.5\n", "positive integer");
+    failure("@grid columns=oops\n", "positive integer");
     failure("@hero title=\"unfinished\n", "unterminated");
     failure("@hero title=a title=b\n", "duplicate attribute");
     failure("@hero title=a\n x\n", "two-space indentation");
@@ -357,13 +360,64 @@ fn diagnostics() {
         "finite",
     );
     failure(
-        "@chart title=x\n  A | B\n  --- | ---\n  row | -1\n",
-        "nonnegative",
+        "@chart title=x\n  A | B\n  --- | ---\n  row | inf\n",
+        "finite",
     );
     failure(
         "@chart title=x\n  A | B\n  --- | ---\n  row | x\n",
         "invalid chart number",
     );
+}
+
+#[test]
+fn grids_have_no_design_cap() {
+    let html = render("@grid columns=9\n  Nine columns.\n");
+    assert!(html.contains("class=\"grid cols-9\""));
+    assert!(html.contains(".grid.cols-9 { --grid-columns: 9; --grid-tablet-columns: 2; }"));
+}
+
+#[test]
+fn charts_have_no_series_cap() {
+    let html = render(
+        "@chart title=Many\n  Category | A | B | C | D | E | F | G | H\n  --- | --- | --- | --- | --- | --- | --- | --- | ---\n  Row | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8\n",
+    );
+    assert_eq!(html.matches("<rect ").count(), 8);
+    assert!(html.contains(".series-7 { --series: hsl("));
+    assert!(html.contains("<span class=\"series-7\">H</span>"));
+}
+
+#[test]
+fn charts_support_signed_values() {
+    let html = render(
+        "@chart title=Signed\n  Category | Value\n  --- | ---\n  Negative | -1\n  Zero | 0\n  Positive | 1\n",
+    );
+    assert!(html.contains("y1=\"150\" y2=\"150\""));
+    let bars: Vec<&str> = html.split("<rect ").skip(1).collect();
+    for (bar, y, height) in [
+        (&bars[0], "150", "120"),
+        (&bars[1], "150", "0"),
+        (&bars[2], "30", "120"),
+    ] {
+        assert!(bar.contains(&format!("y=\"{y}\"")));
+        assert!(bar.contains(&format!("height=\"{height}\"")));
+    }
+    assert!(html.contains("Negative: -1"));
+    assert!(html.contains("Positive: 1"));
+}
+
+#[test]
+fn chart_structure_is_still_validated() {
+    for body in [
+        "  A\n  ---\n  category\n",
+        "  A | B\n  invalid | separator\n  category | 1\n",
+        "  A | B\n  --- | ---\n  category | 1 | 2\n",
+        "  A | B\n  --- | ---\n",
+    ] {
+        let tmp = TempDir::new().unwrap();
+        let input = tmp.path().join("chart.meld");
+        fs::write(&input, format!("@chart title=Invalid\n{body}")).unwrap();
+        assert!(!cli(&[input.to_str().unwrap(), "-o", "-"]).status.success());
+    }
 }
 
 #[test]
@@ -474,8 +528,9 @@ fn default_output_and_no_input_overwrite() {
 fn css_hash_matches_and_output_is_deterministic() {
     use base64::{Engine, engine::general_purpose::STANDARD};
     use sha2::{Digest, Sha256};
-    let first = render("# Hi\n");
-    assert_eq!(first, render("# Hi\n"));
+    let source = "@grid columns=9\n  Hi\n\n@chart title=Many\n  Category | A | B | C | D | E | F | G\n  --- | --- | --- | --- | --- | --- | --- | ---\n  Row | -1 | 2 | 3 | 4 | 5 | 6 | 7\n";
+    let first = render(source);
+    assert_eq!(first, render(source));
     let css = first
         .split_once("<style>")
         .unwrap()

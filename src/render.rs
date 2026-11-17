@@ -5,7 +5,10 @@ use crate::{
 use anyhow::{Context, Result, bail};
 use minijinja::{AutoEscape, Environment, UndefinedBehavior, context};
 use pulldown_cmark::{CowStr, Event, Options, Parser, Tag, TagEnd, html};
-use std::collections::BTreeMap;
+use std::{
+    cell::RefCell,
+    collections::{BTreeMap, BTreeSet},
+};
 
 pub fn escape(s: &str) -> String {
     s.replace('&', "&amp;")
@@ -18,6 +21,7 @@ pub fn escape(s: &str) -> String {
 pub struct Renderer<'a> {
     setup: &'a Setup,
     env: Environment<'a>,
+    styles: RefCell<BTreeSet<String>>,
 }
 
 impl<'a> Renderer<'a> {
@@ -28,11 +32,27 @@ impl<'a> Renderer<'a> {
         for (name, template) in &setup.templates {
             env.add_template(name, template)?;
         }
-        Ok(Self { setup, env })
+        Ok(Self {
+            setup,
+            env,
+            styles: RefCell::default(),
+        })
     }
 
     pub fn render(&self, source: &str) -> Result<String> {
+        self.styles.borrow_mut().clear();
         self.nodes(&syntax::parse(source)?, 0)
+    }
+
+    pub fn css(&self) -> String {
+        self.styles
+            .borrow()
+            .iter()
+            .fold(self.setup.css.clone(), |mut css, rule| {
+                css.push('\n');
+                css.push_str(rule);
+                css
+            })
     }
 
     fn nodes(&self, nodes: &[Node], depth: usize) -> Result<String> {
@@ -97,10 +117,16 @@ impl<'a> Renderer<'a> {
         }
         if name == "grid" {
             let columns = values.get("columns").context("grid requires columns")?;
-            anyhow::ensure!(
-                matches!(columns.as_str(), "1" | "2" | "3" | "4"),
-                "grid columns must be 1–4"
-            );
+            let columns: usize = columns
+                .parse()
+                .ok()
+                .filter(|n| *n > 0)
+                .context("grid columns must be a positive integer")?;
+            values.insert("columns".into(), columns.to_string());
+            self.styles.borrow_mut().insert(format!(
+                ".grid.cols-{columns} {{ --grid-columns: {columns}; --grid-tablet-columns: {}; }}",
+                columns.min(2)
+            ));
         }
         let value = values.get("value").map(String::as_str).unwrap_or("");
         let split = value
@@ -110,7 +136,10 @@ impl<'a> Renderer<'a> {
             .unwrap_or(value.len());
         let (number, unit) = value.split_at(split);
         let chart = if name == "chart" {
-            crate::chart::render(raw, values.get("title").map(String::as_str).unwrap_or(""))?
+            let (html, styles) =
+                crate::chart::render(raw, values.get("title").map(String::as_str).unwrap_or(""))?;
+            self.styles.borrow_mut().extend(styles);
+            html
         } else {
             String::new()
         };

@@ -52,11 +52,7 @@ caption { text-align: left; color: var(--subtext); margin-bottom: .6em; }
 hr { border: 0; border-top: 1px solid var(--overlay); margin: 2em 0; }
 strong { font-weight: 700; }
 ::selection { background: var(--surface); color: var(--text); }
-.grid { display: grid; gap: 20px; margin: 24px 0; align-items: stretch; }
-.grid.cols-1 { grid-template-columns: minmax(0, 1fr); }
-.grid.cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.grid.cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.grid.cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.grid { display: grid; grid-template-columns: repeat(var(--grid-columns, 2), minmax(0, 1fr)); gap: 20px; margin: 24px 0; align-items: stretch; }
 .grid > * { min-width: 0; margin: 0; }
 .panel, .metric { background: var(--mantle); border: 1px solid var(--surface); border-radius: 14px; padding: 24px; margin: 24px 0; }
 .grid > .panel, .grid > .metric { margin: 0; }
@@ -119,12 +115,12 @@ strong { font-weight: 700; }
 .chart-data { margin-top: 16px; font-size: .8rem; color: var(--subtext); overflow-x: auto; }
 .chart-data summary { cursor: pointer; }
 @media (max-width: 760px) {
-  .grid.cols-3, .grid.cols-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .grid { grid-template-columns: repeat(var(--grid-tablet-columns, 2), minmax(0, 1fr)); }
   .masthead, .footer { align-items: flex-start; flex-direction: column; gap: 8px; }
   .panel, .metric { padding: 20px; }
 }
 @media (max-width: 520px) {
-  .grid.cols-2, .grid.cols-3, .grid.cols-4 { grid-template-columns: minmax(0, 1fr); }
+  .grid { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 600px) {
   main { padding: 24px 16px; }

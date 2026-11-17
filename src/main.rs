@@ -86,7 +86,9 @@ fn run(cli: Cli, default_config: PathBuf) -> Result<()> {
     )?;
     let source =
         fs::read_to_string(&input).with_context(|| format!("reading {}", input.display()))?;
-    let body = render::Renderer::new(&setup)?.render(&source)?;
+    let renderer = render::Renderer::new(&setup)?;
+    let body = renderer.render(&source)?;
+    let css = renderer.css();
     let title = cli
         .title
         .as_deref()
@@ -98,12 +100,12 @@ fn run(cli: Cli, default_config: PathBuf) -> Result<()> {
                 .unwrap_or("Document")
         });
     let lang = setup.config.lang.as_deref().unwrap_or("en");
-    let hash = STANDARD.encode(Sha256::digest(setup.css.as_bytes()));
+    let hash = STANDARD.encode(Sha256::digest(css.as_bytes()));
     let html = format!(
         "<!doctype html>\n<html lang=\"{}\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'sha256-{hash}'; base-uri 'none'; form-action 'none'\">\n<title>{}</title>\n<style>{}</style>\n</head>\n<body><main><article>{body}</article></main></body>\n</html>\n",
         render::escape(lang),
         render::escape(title),
-        setup.css
+        css
     );
     if output.as_os_str() == "-" {
         io::stdout().lock().write_all(html.as_bytes())?;

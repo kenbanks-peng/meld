@@ -126,7 +126,7 @@ Built-ins:
 | --- | --- | --- |
 | `masthead`, `footer` | — | Flex layout for paragraphs |
 | `hero` | `title` | `eyebrow=""` |
-| `grid` | — | `columns=2`; supports 1–4 |
+| `grid` | — | `columns=2`; positive integer |
 | `metric` | `label`, `value` | `tone=mauve`; numeric suffix becomes a unit |
 | `panel` | `title` | `label=""` |
 | `summary`, `muted` | — | Subdued text |
@@ -135,7 +135,7 @@ Built-ins:
 | `status` | — | Inline; `tone=positive` |
 | `chart` | `title` | Markdown table body; first column is categories |
 
-Charts support 1–6 numeric series with finite, nonnegative values, including zero.
+Charts accept one or more numeric series with finite values, including negatives and zero.
 The rendered SVG includes a legend and an expandable data table.
 Metric templates also receive `number` and `unit`; chart templates receive `chart`
 (the generated SVG and legend).

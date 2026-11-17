@@ -11,6 +11,12 @@ pub fn guide(setup: &Setup) -> String {
         out.push_str("\nNo components configured; use ordinary Markdown.\n");
         return out;
     }
+    if setup.definitions.contains_key("grid") {
+        out.push_str("\nGrid: columns must be a positive integer.\n");
+    }
+    if setup.definitions.contains_key("chart") {
+        out.push_str("\nChart body: Markdown table; first column is categories, followed by one or more finite numeric series. Negative values and zero are supported.\n");
+    }
     out.push_str("\nComponent | Mode | Required | Defaults\n--- | --- | --- | ---\n");
     let mut blocks = BTreeMap::new();
     let mut inlines = Vec::new();
