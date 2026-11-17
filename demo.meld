@@ -1,0 +1,68 @@
+@masthead
+  **◈ Northstar / Engineering**
+
+  Internal report · September 2026
+
+@hero eyebrow="Quarterly review / Q3 2026" title="Engineering pulse."
+  A quieter platform. A faster release cycle. A look at the systems, shipments, and small improvements that moved us forward.
+
+@grid columns=4
+  @metric label="Deployments" value=226 tone=mauve
+    ↑ 30.6% vs. previous quarter
+
+  @metric label="Platform uptime" value=99.97% tone=teal
+    Above target of 99.95%
+
+  @metric label="Lead time" value=4.2h tone=blue
+    ↓ 28% from 5.8 hours
+
+  @metric label="Change failure rate" value=2.1% tone=peach
+    ↓ 1.3 pp vs. previous quarter
+
+@panel label="01 / The big picture" title="Executive summary"
+  @badge[On track]
+
+  @grid columns=2
+    @summary
+      Delivery accelerated without trading away reliability. Smaller changes, a shorter CI pipeline, and clearer service ownership helped the team ship 226 production deployments this quarter. The next focus is reducing background-job latency as usage grows.
+
+    @callout tone=teal title="The quarter’s biggest win"
+      Build caching cut median pipeline time from 14 minutes to 8 minutes, giving engineers more time for the work that matters.
+
+@panel label="02 / Delivery cadence" title="More frequent, smaller releases"
+  @chart title="Production deployments by month, Q2 versus Q3 2026"
+    Category  | Q2 2026 | Q3 2026
+    --------- | ------- | -------
+    Apr / Jul | 48      | 64
+    May / Aug | 59      | 76
+    Jun / Sep | 66      | 86
+
+  @muted
+    Production deployments · Q2: 173 total · Q3: 226 total · Rollbacks excluded.
+
+@panel label="03 / Platform health" title="Service scorecard"
+  @badge[4 core services]
+
+  @muted
+    Quarterly service metrics. Latency is the 95th percentile; worker latency measures job execution time.
+
+  Service                | Owner          | Uptime | P95 latency | Deploys | Status
+  ---------------------- | -------------- | ------ | ----------- | ------- | ---------------------------------------
+  **API gateway**        | Platform       | 99.99% | 124 ms      | 72      | @status[● Healthy]
+  **Web application**    | Experience     | 99.98% | 218 ms      | 84      | @status[● Healthy]
+  **Background workers** | Infrastructure | 99.94% | 842 ms      | 46      | @status(tone=warning)[● Watch latency]
+  **Identity**           | Platform       | 99.99% | 96 ms       | 24      | @status[● Healthy]
+
+@grid columns=2
+  @panel label="04 / Looking ahead" title="Next quarter’s focus"
+    - Split long-running jobs into a dedicated worker pool.
+    - Extend deployment safeguards to all core services.
+    - Bring median pipeline time below six minutes.
+
+  @panel label="05 / About the numbers" title="Scope & methodology"
+    Reporting window: July 1–September 30, 2026. Lead time is the median from merge to production. Platform uptime is measured by an end-to-end availability probe, not an average of service uptime. All data is fictional and provided for demonstration.
+
+@footer
+  Northstar Engineering · Demo report
+
+  Catppuccin Mocha / meld · Mark Elements Down

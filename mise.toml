@@ -1,0 +1,18 @@
+[tasks.build]
+description = "Build the production binary"
+dir = "{{config_root}}"
+run = "cargo build --release --locked"
+
+[tasks.deploy]
+description = "Build and atomically deploy the binary to ./bin/"
+depends = ["build"]
+dir = "{{config_root}}"
+run = '''
+set -eu
+mkdir -p bin
+tmp="$(mktemp bin/.meld.XXXXXX)"
+trap 'rm -f "$tmp"' EXIT
+cp target/release/meld "$tmp"
+chmod 755 "$tmp"
+mv -f "$tmp" bin/meld
+'''
