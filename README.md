@@ -15,7 +15,7 @@ cargo install --path .
 meld demo.meld --title "Engineering pulse · Q3 2026"
 meld report.meld -o report.html
 meld report.meld -o -                  # stdout
-meld skill                            # concise agent guide with an example
+meld skill                            # authoring guide + active component examples
 ```
 
 Without `-o`, output uses the input filename with an `.html` extension.
@@ -43,7 +43,7 @@ meld --init design
 meld demo.meld --config design/config.toml
 ```
 
-`--config` replaces the default design, rather than merging with it.
+`meld skill --config design/config.toml --components extra` documents the same\nactive components as rendering, including custom definitions and defaults.\n\n`--config` replaces the default design, rather than merging with it.
 Theme and template paths resolve relative to the config, not the working directory.
 
 A minimal standalone config (defines only `@notice`):

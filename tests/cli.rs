@@ -62,7 +62,7 @@ fn cli_uses_meld_branding() {
 }
 
 #[test]
-fn skill_prints_embedded_guide_without_files() {
+fn skill_prints_active_guide_without_working_directory_files() {
     let tmp = TempDir::new().unwrap();
     let config_home = TempDir::new().unwrap();
     let out = Command::new(env!("CARGO_BIN_EXE_meld"))
@@ -73,10 +73,32 @@ fn skill_prints_embedded_guide_without_files() {
         .unwrap();
     assert!(out.status.success());
     assert!(out.stderr.is_empty());
+    let guide = String::from_utf8(out.stdout).unwrap();
+    assert!(guide.starts_with(include_str!("../assets/skill.md")));
+    for name in [
+        "badge", "callout", "chart", "footer", "grid", "hero", "masthead", "metric", "muted",
+        "panel", "status", "summary",
+    ] {
+        assert!(guide.contains(&format!("@{name} | ")));
+    }
     assert_eq!(
-        String::from_utf8(out.stdout).unwrap(),
-        include_str!("../assets/skill.md")
+        guide
+            .lines()
+            .filter(|line| line.starts_with('@') && line.contains(" | "))
+            .count(),
+        12
     );
+    for omitted in [
+        "## Customize",
+        "--init",
+        "--config",
+        "--components",
+        "-o ",
+        "MiniJinja",
+        "XDG_CONFIG_HOME",
+    ] {
+        assert!(!guide.contains(omitted), "unexpected {omitted}");
+    }
     assert_eq!(fs::read_dir(tmp.path()).unwrap().count(), 0);
     assert!(success(&["--help"]).contains("skill"));
     assert!(success(&["skill", "--help"]).contains("agent instructions"));
@@ -85,23 +107,147 @@ fn skill_prints_embedded_guide_without_files() {
 #[test]
 fn skill_example_renders() {
     let guide = success(&["skill"]);
-    let example = guide
-        .split_once("\x60\x60\x60meld\n")
-        .unwrap()
-        .1
-        .split_once("\x60\x60\x60")
-        .unwrap()
-        .0;
-    let html = render(example);
+    let examples = skill_examples(&guide);
+    assert_eq!(examples.len(), 1);
+    let html = render(&examples.join("\n\n"));
     for expected in [
         "Weekly report",
         "cols-2",
-        "99.97",
-        "status warning",
+        "status positive",
         "<svg ",
+        "class=\"masthead\"",
+        "class=\"hero\"",
+        "class=\"metric tone-mauve\"",
+        "class=\"panel\"",
+        "class=\"summary\"",
+        "class=\"callout tone-teal\"",
+        "class=\"muted\"",
+        "class=\"badge\"",
+        "class=\"footer\"",
     ] {
         assert!(html.contains(expected), "missing {expected}");
     }
+}
+
+fn skill_examples(guide: &str) -> Vec<String> {
+    use pulldown_cmark::{CodeBlockKind, Event, Parser, Tag, TagEnd};
+    let mut examples = Vec::new();
+    let mut collecting = false;
+    for event in Parser::new(guide) {
+        match event {
+            Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(lang)))
+                if lang.as_ref() == "meld" =>
+            {
+                collecting = true;
+                examples.push(String::new());
+            }
+            Event::End(TagEnd::CodeBlock) => collecting = false,
+            Event::Text(text) if collecting => examples.last_mut().unwrap().push_str(&text),
+            _ => {}
+        }
+    }
+    examples
+}
+
+#[test]
+fn skill_tracks_custom_config_and_template_directory() {
+    let tmp = TempDir::new().unwrap();
+    let config = tmp.path().join("config.toml");
+    let templates = tmp.path().join("templates");
+    fs::create_dir(&templates).unwrap();
+    fs::write(
+        tmp.path().join("notice.html"),
+        "<aside>{{ attrs.title }} {{ attrs.tone }} {{ content|safe }}</aside>",
+    )
+    .unwrap();
+    fs::write(
+        tmp.path().join("pill.html"),
+        "<i>{{ attrs.label }} {{ content|safe }}</i>",
+    )
+    .unwrap();
+    fs::write(templates.join("extra.html"), "<b>{{ content|safe }}</b>").unwrap();
+    fs::write(
+        templates.join("notice.html"),
+        "<section>{{ attrs.title }} {{ content|safe }}</section>",
+    )
+    .unwrap();
+    fs::write(
+        &config,
+        r#"
+[components.notice]
+template = "notice.html"
+required = ["title"]
+[components.notice.defaults]
+tone = 'say "hello" \\ again'
+[components.pill]
+template = "pill.html"
+inline = true
+required = ["label"]
+"#,
+    )
+    .unwrap();
+    let args = [
+        "skill",
+        "--config",
+        config.to_str().unwrap(),
+        "--components",
+        templates.to_str().unwrap(),
+    ];
+    let guide = success(&args);
+    assert_eq!(skill_examples(&guide).len(), 1);
+    assert!(guide.contains("@notice | block | title |"));
+    assert!(guide.contains("@pill | inline | label |"));
+    assert!(guide.contains("@extra | block |"));
+    assert!(!guide.contains("@hero"));
+    let input = tmp.path().join("report.meld");
+    fs::write(&input, skill_examples(&guide).join("\n\n")).unwrap();
+    let html = success(&[
+        input.to_str().unwrap(),
+        "--config",
+        config.to_str().unwrap(),
+        "--components",
+        templates.to_str().unwrap(),
+        "-o",
+        "-",
+    ]);
+    assert!(html.contains("<section>title"));
+    assert!(html.contains("<i>label"));
+    assert!(html.contains("<b>"));
+    fs::remove_file(templates.join("extra.html")).unwrap();
+    assert!(!success(&args).contains("@extra"));
+    fs::write(&config, "").unwrap();
+    let empty = success(&["skill", "-c", config.to_str().unwrap()]);
+    assert!(empty.contains("No components configured"));
+    assert!(skill_examples(&empty).is_empty());
+    fs::write(&config, "invalid TOML").unwrap();
+    let out = cli(&["skill", "-c", config.to_str().unwrap()]);
+    assert!(!out.status.success());
+    assert!(out.stdout.is_empty());
+}
+
+#[test]
+fn skill_tracks_changes_to_default_design() {
+    let tmp = TempDir::new().unwrap();
+    let run = || {
+        Command::new(env!("CARGO_BIN_EXE_meld"))
+            .env("XDG_CONFIG_HOME", tmp.path())
+            .arg("skill")
+            .output()
+            .unwrap()
+    };
+    assert!(run().status.success());
+    fs::write(tmp.path().join("meld/only.html"), "{{ content|safe }}").unwrap();
+    fs::write(
+        tmp.path().join("meld/config.toml"),
+        "[components.only]\ntemplate = 'only.html'\ninline = true\n",
+    )
+    .unwrap();
+    let out = run();
+    assert!(out.status.success());
+    let guide = String::from_utf8(out.stdout).unwrap();
+    assert_eq!(skill_examples(&guide).len(), 1);
+    assert!(guide.contains("@only[Example]"));
+    assert!(!guide.contains("@badge"));
 }
 
 #[test]

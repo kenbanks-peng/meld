@@ -1,6 +1,7 @@
 mod chart;
 mod config;
 mod render;
+mod skill;
 mod syntax;
 
 use anyhow::{Context, Result};
@@ -46,14 +47,25 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     /// Print concise agent instructions for authoring and rendering Meld files
-    Skill,
+    Skill {
+        /// Alternative TOML config (default: $XDG_CONFIG_HOME/meld/config.toml)
+        #[arg(short, long)]
+        config: Option<PathBuf>,
+        /// Directory of component .html templates (overrides configured templates)
+        #[arg(long)]
+        components: Option<PathBuf>,
+    },
 }
 
 fn run(cli: Cli, default_config: PathBuf) -> Result<()> {
-    if let Some(Commands::Skill) = cli.command {
+    if let Some(Commands::Skill { config, components }) = cli.command {
+        let setup = config::Setup::load(
+            config.as_deref().unwrap_or(&default_config),
+            components.as_deref(),
+        )?;
         io::stdout()
             .lock()
-            .write_all(include_bytes!("../assets/skill.md"))?;
+            .write_all(skill::guide(&setup).as_bytes())?;
         return Ok(());
     }
     if let Some(dir) = cli.init {
