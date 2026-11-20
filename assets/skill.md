@@ -2,8 +2,12 @@
 
 Use Meld to supplement Markdown with component elements to produce self-contained HTML.
 
-Write UTF-8 Markdown plus components in `document.meld`. Render with
-`meld document.meld` to create `document.html`.
+Run `meld paths --project <project-directory>` (defaults to the current directory).
+Meld creates global project storage and prints JSON containing absolute
+`source_dir` and `output_dir` paths. Write UTF-8 Markdown plus components to
+`<source_dir>/document.meld`, then render with
+`meld "<source_dir>/document.meld" --output "<output_dir>/document.html"`.
+Keep sources and HTML in these folders, not in the project repository.
 
 ## Syntax
 

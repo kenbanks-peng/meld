@@ -1,5 +1,6 @@
 mod chart;
 mod config;
+mod paths;
 mod render;
 mod skill;
 mod syntax;
@@ -46,6 +47,12 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// Create global project storage and print absolute source_dir/output_dir as JSON
+    Paths {
+        /// Project directory (defaults to the current directory)
+        #[arg(long, default_value = ".")]
+        project: PathBuf,
+    },
     /// Print concise agent instructions for authoring and rendering Meld files
     Skill {
         /// Alternative TOML config (default: $XDG_CONFIG_HOME/meld/config.toml)
@@ -58,14 +65,24 @@ enum Commands {
 }
 
 fn run(cli: Cli, default_config: PathBuf) -> Result<()> {
-    if let Some(Commands::Skill { config, components }) = cli.command {
-        let setup = config::Setup::load(
-            config.as_deref().unwrap_or(&default_config),
-            components.as_deref(),
-        )?;
-        io::stdout()
-            .lock()
-            .write_all(skill::guide(&setup).as_bytes())?;
+    if let Some(command) = cli.command {
+        match command {
+            Commands::Paths { project } => {
+                let paths = paths::ProjectPaths::create(&project)?;
+                let mut stdout = io::stdout().lock();
+                serde_json::to_writer(&mut stdout, &paths)?;
+                writeln!(stdout)?;
+            }
+            Commands::Skill { config, components } => {
+                let setup = config::Setup::load(
+                    config.as_deref().unwrap_or(&default_config),
+                    components.as_deref(),
+                )?;
+                io::stdout()
+                    .lock()
+                    .write_all(skill::guide(&setup).as_bytes())?;
+            }
+        }
         return Ok(());
     }
     if let Some(dir) = cli.init {

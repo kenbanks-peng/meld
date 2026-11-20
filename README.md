@@ -19,6 +19,19 @@ meld skill                            # authoring guide + active component examp
 Without `-o`, output uses the input filename with an `.html` extension.
 Errors leave the output untouched.
 
+For global, per-project storage without repository-local files:
+
+```sh
+meld paths --project /path/to/project   # defaults to the current directory
+```
+
+This creates storage and prints JSON with absolute `source_dir` and `output_dir`
+paths. Write `.meld` sources in `source_dir` and render HTML into `output_dir`
+using `--output`. Storage lives under `$XDG_DATA_HOME/meld` (falling back to
+`~/.local/share/meld` when unset, empty, or relative), grouped by project name
+plus a 12-character SHA-256 hash of its canonical absolute path. Symlink aliases
+share storage; projects with the same name in different locations do not.
+
 ## Themes and components
 
 Every run ensures `$XDG_CONFIG_HOME/meld` exists (falling back to
