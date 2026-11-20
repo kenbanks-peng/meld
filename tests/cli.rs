@@ -75,10 +75,20 @@ fn skill_prints_active_guide_without_working_directory_files() {
     assert!(out.stderr.is_empty());
     let guide = String::from_utf8(out.stdout).unwrap();
     assert!(guide.starts_with(include_str!("../assets/skill.md")));
-    assert!(guide.contains("Use Meld to supplement Markdown with component elements"));
-    assert!(guide.contains("never invent actions or verification results"));
-    assert!(!guide.contains("Weekly report"));
-    assert!(!guide.contains("Deployments"));
+    assert!(guide.contains("1. Run `meld paths"));
+    assert!(guide.contains("## Syntax example"));
+    assert_eq!(guide.matches("Grid: columns").count(), 1);
+    assert_eq!(guide.matches("Chart body:").count(), 1);
+    for omitted in [
+        "agent conversation",
+        "verification results",
+        "1–4",
+        "1–6",
+        "nonnegative",
+        "terminal-browser",
+    ] {
+        assert!(!guide.contains(omitted), "unexpected {omitted}");
+    }
     for name in [
         "badge", "callout", "chart", "footer", "grid", "hero", "masthead", "metric", "muted",
         "panel", "status", "summary",
@@ -115,10 +125,9 @@ fn skill_example_renders() {
     assert_eq!(examples.len(), 1);
     let html = render(&examples.join("\n\n"));
     for expected in [
-        "Conversation result",
-        "Findings and verification",
-        "Fixed relative path resolution.",
-        "Review the diff.",
+        "Title",
+        "Label",
+        "Example <strong>Markdown</strong>.",
         "cols-2",
         "status positive",
         "<svg ",

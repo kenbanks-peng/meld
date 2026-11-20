@@ -52,11 +52,8 @@ pub fn guide(setup: &Setup) -> String {
             .iter()
             .map(|key| {
                 let value = match (name.as_str(), key.as_str()) {
-                    ("hero", "title") => "Conversation result",
-                    ("panel", "title") => "Findings and verification",
-                    ("callout", "title") => "Next step",
-                    ("chart", "title") => "Verification results",
-                    ("metric", "label") => "Tests passed",
+                    ("hero" | "panel" | "callout" | "chart", "title") => "Title",
+                    ("metric", "label") => "Label",
                     ("metric", "value") => "12",
                     ("grid", "columns") => "2",
                     _ => key,
@@ -72,7 +69,7 @@ pub fn guide(setup: &Setup) -> String {
                 format!("({attrs})")
             };
             let body = match name.as_str() {
-                "badge" => "Example session",
+                "badge" => "Label",
                 "status" => "Verified",
                 _ => "Example",
             };
@@ -84,34 +81,15 @@ pub fn guide(setup: &Setup) -> String {
                 format!(" {attrs}")
             };
             let body = match name.as_str() {
-                "masthead" => "**Agent conversation**\n\nTask: fix configuration loading",
-                "hero" => {
-                    "Configuration paths now resolve relative to the config file, not the working directory."
-                }
+                "masthead" | "hero" => "Text.",
                 "grid" | "panel" => "",
-                "metric" => "All checks passed in this example session.",
-                "summary" => {
-                    "**Fixed relative path resolution.** Inspection found paths were resolved from the working directory. Updated the loader and added regression tests."
-                }
-                "callout" => "- Review the diff.\n- Commit when ready.",
-                "chart" => "Check | Passed\n--- | ---\nUnit tests | 9\nIntegration tests | 3",
-                "muted" => {
-                    "Illustrative conversation outcome; these results are not from a live run."
-                }
-                "footer" => "Agent conversation · Result and handoff",
+                "chart" => "Category | Value\n--- | ---\nA | 9\nB | -3",
                 _ => "Example **Markdown**.",
             };
             blocks.insert(name.as_str(), format!("@{name}{args}\n{}", indent(body)));
         }
     }
-    if setup.definitions.contains_key("grid") {
-        out.push_str("\nGrid: columns must be 1–4.\n");
-    }
-    if setup.definitions.contains_key("chart") {
-        out.push_str("\nChart body: Markdown table; first column is categories, followed by 1–6\nfinite, nonnegative numeric series. Use plain numbers, without units or separators.\n");
-    }
-
-    // Assemble one conversation result, nesting only components declared in block mode.
+    // Nest only components declared in block mode.
     for (parent, children) in [
         ("grid", &["metric", "callout"][..]),
         ("panel", &["summary", "chart", "muted"][..]),
@@ -149,7 +127,12 @@ pub fn guide(setup: &Setup) -> String {
     }
     // Attribute values may contain fence characters.
     let fence = "~".repeat(example.chars().filter(|c| *c == '~').count().max(2) + 1);
-    writeln!(out, "\n## Complete example\n\nThis illustrative agent conversation result shows findings, changes, verification, and next steps. Adapt it to the actual conversation; never invent actions or verification results. Use only the components your document needs.\n\n{fence}meld\n{}\n{fence}", example.trim_end()).unwrap();
+    writeln!(
+        out,
+        "\n## Syntax example\n\n{fence}meld\n{}\n{fence}",
+        example.trim_end()
+    )
+    .unwrap();
     out
 }
 
